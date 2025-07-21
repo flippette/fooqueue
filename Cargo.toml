@@ -12,3 +12,17 @@ keywords = [
   "queue",
   "no-std",
 ]
+
+[features]
+default = ["alloc", "allocator-api2"]
+alloc = ["allocator-api2?/alloc"]
+allocator-api2 = ["dep:allocator-api2"]
+nightly = []
+
+[dependencies]
+portable-atomic = "1"
+
+[dependencies.allocator-api2]
+version = "0.3"
+optional = true
+default-features = false

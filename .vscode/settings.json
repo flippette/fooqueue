@@ -1,0 +1,8 @@
+{
+  "rust-analyzer": {
+    "cargo": {
+      "features": ["alloc", "allocator-api2"],
+      "noDefaultFeatures": true
+    }
+  }
+}
