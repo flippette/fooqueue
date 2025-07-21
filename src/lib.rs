@@ -144,3 +144,88 @@ where
     while let Some(_) = self.pop() {}
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use core::cell::Cell;
+  #[cfg(feature = "nightly")]
+  use std::alloc::Global;
+  use std::thread;
+
+  #[cfg(feature = "allocator-api2")]
+  use allocator_api2::alloc::Global;
+
+  use super::Queue;
+
+  #[test]
+  fn push_pop() {
+    let queue = Queue::new_in(Global);
+
+    queue.push(1);
+    queue.push(2);
+    queue.push(3);
+    assert_eq!(queue.pop(), Some(3));
+    assert_eq!(queue.pop(), Some(2));
+    queue.push(4);
+    assert_eq!(queue.pop(), Some(4));
+    assert_eq!(queue.pop(), Some(1));
+    assert_eq!(queue.pop(), None);
+  }
+
+  #[test]
+  fn drops() {
+    let queue = Queue::new_in(Global);
+    let drops = Cell::new(0);
+
+    struct DetectDrop<'a>(&'a Cell<i32>);
+    impl Drop for DetectDrop<'_> {
+      fn drop(&mut self) {
+        self.0.update(|n| n + 1);
+      }
+    }
+
+    queue.push(DetectDrop(&drops));
+    queue.push(DetectDrop(&drops));
+    queue.push(DetectDrop(&drops));
+    queue.push(DetectDrop(&drops));
+    queue.push(DetectDrop(&drops));
+    drop(queue);
+
+    assert_eq!(drops.get(), 5);
+  }
+
+  #[test]
+  fn threads() {
+    let queue = Queue::new_in(Global);
+
+    queue.push(1);
+    queue.push(2);
+    queue.push(3);
+
+    assert_eq!(queue.len(), 3);
+    assert_eq!(queue.pop(), Some(3));
+    assert_eq!(queue.pop(), Some(2));
+    assert_eq!(queue.pop(), Some(1));
+    assert!(queue.is_empty());
+
+    thread::scope(|s| {
+      for _ in 0..16 {
+        let queue = &queue;
+        s.spawn(move || {
+          for i in 0..4096 {
+            queue.push(i);
+          }
+        });
+      }
+
+      let queue = &queue;
+      s.spawn(move || {
+        for _ in 0..1024 {
+          while queue.pop().is_none() {}
+        }
+      });
+    });
+
+    assert_eq!(queue.len(), 16 * 4096 - 1024);
+  }
+}
