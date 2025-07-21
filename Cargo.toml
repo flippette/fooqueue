@@ -1,0 +1,14 @@
+[package]
+name = "fooqueue"
+version = "0.1.0"
+edition = "2024"
+authors = ["flippette <me@flippo.cc>"]
+license = "MIT OR Apache-2.0"
+description = "a simple, lock-free FIFO queue"
+keywords = [
+  "concurrent",
+  "lock-free",
+  "fifo",
+  "queue",
+  "no-std",
+]
