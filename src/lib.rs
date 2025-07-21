@@ -209,7 +209,7 @@ mod tests {
     assert!(queue.is_empty());
 
     thread::scope(|s| {
-      for _ in 0..16 {
+      for _ in 0..14 {
         let queue = &queue;
         s.spawn(move || {
           for i in 0..4096 {
@@ -218,14 +218,16 @@ mod tests {
         });
       }
 
-      let queue = &queue;
-      s.spawn(move || {
-        for _ in 0..1024 {
-          while queue.pop().is_none() {}
-        }
-      });
+      for _ in 0..2 {
+        let queue = &queue;
+        s.spawn(move || {
+          for _ in 0..1024 {
+            while queue.pop().is_none() {}
+          }
+        });
+      }
     });
 
-    assert_eq!(queue.len(), 16 * 4096 - 1024);
+    assert_eq!(queue.len(), 14 * 4096 - 2 * 1024);
   }
 }

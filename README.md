@@ -24,7 +24,7 @@ assert!(queue.is_empty());
 
 // can be used from multiple threads!
 thread::scope(|s| {
-  for _ in 0..8 {
+  for _ in 0..6 {
     let queue = &queue;
     s.spawn(move || {
       for i in 0..1024 {
@@ -33,13 +33,15 @@ thread::scope(|s| {
     });
   }
 
-  let queue = &queue;
-  s.spawn(move || {
-    for _ in 0..512 {
-      while queue.pop().is_none() {}
-    }
-  });
+  for _ in 0..2 {
+    let queue = &queue;
+    s.spawn(move || {
+      for _ in 0..512 {
+        while queue.pop().is_none() {}
+      }
+    });
+  }
 });
 
-assert_eq!(queue.len(), 8 * 1024 - 512);
+assert_eq!(queue.len(), 6 * 1024 - 2 * 512);
 ```
