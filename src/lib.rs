@@ -69,7 +69,7 @@ where
 impl<T> Queue<T, Global> {
   /// create a new queue.
   pub const fn new() -> Self {
-    const { Self::new_in(Global) }
+    Self::new_in(Global)
   }
 }
 
