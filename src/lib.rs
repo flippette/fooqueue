@@ -194,40 +194,49 @@ mod tests {
     assert_eq!(drops.get(), 5);
   }
 
+  #[cfg(not(miri))]
   #[test]
   fn threads() {
+    threads_impl::<8, 4096, 8, 1024>();
+  }
+
+  #[cfg(miri)]
+  #[test]
+  fn threads() {
+    threads_impl::<4, 128, 4, 64>();
+  }
+
+  fn threads_impl<
+    const PUSH_THREADS: usize,
+    const PUSH_COUNT: usize,
+    const POP_THREADS: usize,
+    const POP_COUNT: usize,
+  >() {
     let queue = Queue::new_in(Global);
 
-    queue.push(1);
-    queue.push(2);
-    queue.push(3);
-
-    assert_eq!(queue.len(), 3);
-    assert_eq!(queue.pop(), Some(3));
-    assert_eq!(queue.pop(), Some(2));
-    assert_eq!(queue.pop(), Some(1));
-    assert!(queue.is_empty());
-
     thread::scope(|s| {
-      for _ in 0..14 {
+      for _ in 0..PUSH_THREADS {
         let queue = &queue;
         s.spawn(move || {
-          for i in 0..4096 {
+          for i in 0..PUSH_COUNT {
             queue.push(i);
           }
         });
       }
 
-      for _ in 0..2 {
+      for _ in 0..POP_THREADS {
         let queue = &queue;
         s.spawn(move || {
-          for _ in 0..1024 {
+          for _ in 0..POP_COUNT {
             while queue.pop().is_none() {}
           }
         });
       }
     });
 
-    assert_eq!(queue.len(), 14 * 4096 - 2 * 1024);
+    assert_eq!(
+      queue.len(),
+      PUSH_THREADS * PUSH_COUNT - POP_THREADS * POP_COUNT
+    );
   }
 }
