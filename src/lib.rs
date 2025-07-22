@@ -13,8 +13,9 @@ extern crate alloc;
 use alloc::alloc::Global;
 #[cfg(feature = "nightly")]
 use core::alloc::{AllocError, Allocator, Layout};
-use core::ptr;
+use core::ptr::NonNull;
 use core::sync::atomic::Ordering::*;
+use core::{hint, ptr};
 
 #[cfg(all(feature = "allocator-api2", feature = "alloc"))]
 use allocator_api2::alloc::Global;
@@ -81,7 +82,7 @@ where
   pub const fn new_in(alloc: A) -> Self {
     Self {
       alloc,
-      head: AtomicPtr::new(ptr::null_mut()),
+      head: null_atomic(),
     }
   }
 
@@ -103,17 +104,57 @@ where
   /// try to push an item to the front of the queue, returning the passed
   /// element on allocation failure.
   pub fn try_push(&self, elem: T) -> Result<(), (T, AllocError)> {
-    todo!()
+    let new_head = match self.alloc.allocate(Node::<T>::LAYOUT) {
+      // SAFETY: `ptr` is a valid pointer to the allocation.
+      Ok(ptr) => unsafe {
+        let ptr = ptr.cast::<Node<T>>().as_ptr();
+        (&raw mut (*ptr).next).write(null_atomic());
+        (&raw mut (*ptr).data).write(elem);
+        ptr
+      },
+      Err(err) => return Err((elem, err)),
+    };
+
+    loop {
+      let old_head = self.head.load(Acquire);
+      // SAFETY: `new_head` is initialized above.
+      unsafe { (*new_head).next.store(old_head, Relaxed) }
+      if self
+        .head
+        .compare_exchange_weak(old_head, new_head, Release, Acquire)
+        .is_ok()
+      {
+        return Ok(());
+      }
+      hint::spin_loop();
+    }
   }
 
   /// pop an item from the front of the queue.
   pub fn pop(&self) -> Option<T> {
-    todo!()
-  }
-
-  /// get the [`Layout`] of a queue node.
-  const fn node_layout() -> Layout {
-    Layout::new::<Node<T>>()
+    loop {
+      let old_head = self.head.load(Acquire);
+      if old_head.is_null() {
+        return None;
+      }
+      let new_head = unsafe { (*old_head).next.load(Relaxed) };
+      if self
+        .head
+        .compare_exchange_weak(old_head, new_head, Release, Acquire)
+        .is_ok()
+      {
+        unsafe {
+          let data = (&raw mut (*old_head).data).read();
+          // FIXME: this has UB with >1 pop threads!!!
+          self.alloc.deallocate(
+            NonNull::new_unchecked(old_head).cast(),
+            Node::<T>::LAYOUT,
+          );
+          return Some(data);
+        }
+      }
+      hint::spin_loop();
+    }
   }
 }
 
@@ -135,6 +176,16 @@ where
   fn drop(&mut self) {
     while let Some(_) = self.pop() {}
   }
+}
+
+impl<T> Node<T> {
+  /// the memory layout of a node.
+  const LAYOUT: Layout = Layout::new::<Self>();
+}
+
+/// create a null atomic pointer to `T`.
+const fn null_atomic<T>() -> AtomicPtr<T> {
+  AtomicPtr::new(ptr::null_mut())
 }
 
 #[cfg(test)]
