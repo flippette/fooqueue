@@ -22,8 +22,8 @@ use allocator_api2::alloc::Global;
 use allocator_api2::alloc::{AllocError, Allocator, Layout};
 use portable_atomic::{AtomicPtr, AtomicUsize};
 
-#[cfg(not(feature = "alloc"))]
 /// a lock-free FIFO queue.
+#[cfg(not(feature = "alloc"))]
 pub struct Queue<T, A>
 where
   A: Allocator,
@@ -33,8 +33,8 @@ where
   len: AtomicUsize,
 }
 
-#[cfg(feature = "alloc")]
 /// a lock-free FIFO queue.
+#[cfg(feature = "alloc")]
 pub struct Queue<T, A = Global>
 where
   A: Allocator,
