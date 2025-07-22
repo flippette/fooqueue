@@ -16,7 +16,7 @@ queue.push(1);
 queue.push(2);
 queue.push(3);
 
-assert_eq!(queue.len(), 3);
+assert!(!queue.is_empty());
 assert_eq!(queue.pop(), Some(3));
 assert_eq!(queue.pop(), Some(2));
 assert_eq!(queue.pop(), Some(1));
@@ -42,6 +42,4 @@ thread::scope(|s| {
     });
   }
 });
-
-assert_eq!(queue.len(), 6 * 1024 - 2 * 512);
 ```

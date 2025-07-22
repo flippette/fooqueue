@@ -20,7 +20,7 @@ use core::sync::atomic::Ordering::*;
 use allocator_api2::alloc::Global;
 #[cfg(feature = "allocator-api2")]
 use allocator_api2::alloc::{AllocError, Allocator, Layout};
-use portable_atomic::{AtomicPtr, AtomicUsize};
+use portable_atomic::AtomicPtr;
 
 /// a lock-free FIFO queue.
 #[cfg(not(feature = "alloc"))]
@@ -30,7 +30,6 @@ where
 {
   alloc: A,
   head: AtomicPtr<Node<T>>,
-  len: AtomicUsize,
 }
 
 /// a lock-free FIFO queue.
@@ -41,7 +40,6 @@ where
 {
   alloc: A,
   head: AtomicPtr<Node<T>>,
-  len: AtomicUsize,
 }
 
 /// a queue node.
@@ -84,18 +82,12 @@ where
     Self {
       alloc,
       head: AtomicPtr::new(ptr::null_mut()),
-      len: AtomicUsize::new(0),
     }
-  }
-
-  /// get the length of the queue.
-  pub fn len(&self) -> usize {
-    self.len.load(Acquire)
   }
 
   /// is the queue empty?
   pub fn is_empty(&self) -> bool {
-    self.len() == 0
+    self.head.load(Acquire).is_null()
   }
 
   /// push an item to the front of the queue.
@@ -234,9 +226,10 @@ mod tests {
       }
     });
 
-    assert_eq!(
-      queue.len(),
-      PUSH_THREADS * PUSH_COUNT - POP_THREADS * POP_COUNT
-    );
+    let mut len = 0;
+    while let Some(_) = queue.pop() {
+      len += 1;
+    }
+    assert_eq!(len, PUSH_THREADS * PUSH_COUNT - POP_THREADS * POP_COUNT);
   }
 }
