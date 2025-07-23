@@ -3,6 +3,7 @@ channel = "nightly"
 components = [
   "clippy",
   "miri",
+  "rust-analyzer",
   "rust-src",
   "rustfmt",
 ]
