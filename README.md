@@ -9,7 +9,6 @@ use std::thread;
 
 use fooqueue::Queue;
 
-// no need to be `mut`!
 let mut queue = Queue::new();
 
 {
