@@ -10,36 +10,42 @@ use std::thread;
 use fooqueue::Queue;
 
 // no need to be `mut`!
-let queue = Queue::new();
+let mut queue = Queue::new();
 
-queue.push(1);
-queue.push(2);
-queue.push(3);
+{
+  let (mut tx, mut rx) = queue.split();
 
-assert!(!queue.is_empty());
-assert_eq!(queue.pop(), Some(3));
-assert_eq!(queue.pop(), Some(2));
-assert_eq!(queue.pop(), Some(1));
-assert!(queue.is_empty());
+  tx.push(1);
+  tx.push(2);
+  tx.push(3);
 
-// can be used from multiple threads!
-thread::scope(|s| {
-  for _ in 0..6 {
-    let queue = &queue;
+  assert!(!tx.queue().is_empty());
+  assert_eq!(rx.pop(), Some(3));
+  assert_eq!(rx.pop(), Some(2));
+  assert_eq!(rx.pop(), Some(1));
+  assert!(tx.queue().is_empty());
+
+  // can be used from multiple threads!
+  thread::scope(|s| {
+    for _ in 0..6 {
+      // producers can be cloned cheaply
+      let mut tx = tx.clone();
+      s.spawn(move || {
+        for i in 0..1024 {
+          tx.push(i);
+        }
+      });
+    }
+
+    // only one consumer may exist
     s.spawn(move || {
-      for i in 0..1024 {
-        queue.push(i);
+      for i in 0..512 {
+        rx.pop();
       }
     });
-  }
+  });
+}
 
-  for _ in 0..2 {
-    let queue = &queue;
-    s.spawn(move || {
-      for _ in 0..512 {
-        while queue.pop().is_none() {}
-      }
-    });
-  }
-});
+// queue can be re-split after the tx-rx pair expires
+let (_tx, _rx) = queue.split();
 ```
